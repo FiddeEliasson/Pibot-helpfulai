@@ -13,7 +13,7 @@ from discord.ext.commands.errors import ExtensionNotLoaded
 
 import exts.utils.listener
 import exts.utils.twitter
-import exts.utils.youtube
+# import exts.utils.youtube
 import exts.utils.alarm
 
 # CONSTANTS ###################################################################
@@ -23,16 +23,23 @@ DESCRIPTION = 'OrdiNeu\'s Discord bot for the Netrunner channel.'
 HELP_ATTRS = {'hidden': True}
 EXTENSIONS = [
     'exts.admin',
-    'exts.Netrunner',
     'exts.Arkham',
-    'exts.LOTR',
-    'exts.Fortune',
-    'exts.Chan',
-    'exts.reddit',
-    'exts.LFR',
-    'exts.Uncategorised',
-    "exts.waifu"
+    'exts.ArkhamChaosBag',
+    'exts.ArkhamPlayer',
 ]
+
+#EXTENSIONS = [
+#    'exts.admin',
+#    'exts.Netrunner',
+#    'exts.Arkham',
+#    'exts.LOTR',
+#    'exts.Fortune',
+#    'exts.Chan',
+#    'exts.reddit',
+#    'exts.LFR',
+#    'exts.Uncategorised',
+#    "exts.waifu"
+#]
 
 bot = commands.Bot(
     command_prefix=COMMAND_PREFIX,
