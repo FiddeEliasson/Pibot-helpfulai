@@ -1,4 +1,4 @@
-# Netrunner extension for pibot
+# Arkham extension for pibot
 ### PREAMBLE ##################################################################
 import copy
 import re
@@ -8,7 +8,6 @@ import requests
 from discord.ext import commands
 from unidecode import unidecode
 
-
 class Arkham(commands.Cog):
     """Arkham Horror related commands"""
 
@@ -16,9 +15,50 @@ class Arkham(commands.Cog):
         self.bot = bot
         self.ah_api = [{}]
         self.ah_api_p = [{}]
+        self.ah_api_faq = [{}]
         self.init_api = False
         self.type_code_sort = {'investigator': 0, 'asset': 1, 'event': 2, 'skill': 3, 'scenario': 4, 'treachery': 5,
                                'enemy': 6}
+        self.query_corrections = {"mississippi manatee": "leo de luca",
+"manatee": "leo de luca",
+"ordineu": "scavenging",
+"mylan": "milan",
+"that same corpse again": "rotting remains",
+"mr. pawterson": "cherished keepsake",
+"bill": "william yorick",
+"sean": "abandoned and alone",
+"thud": "stunning blow",
+"old sparky": "lightning gun",
+"bmoc": "peter sylvestre",
+"quiche": "emergency cache",
+"the stranger": "the man in the pallid mask",
+"pills": "painkillers",
+"opium": "smoking pipe",
+"dttf": "drawn to the flame",
+"doot": "jim's trumpet",
+"free xp": "delve too deep",
+"this is fine": "deny existence",
+":rat: lead": "eat lead",
+"mcdog3": "guard dog",
+"nick": "shotgun",
+"useless": "springfield",
+"god": "wendy adams",
+"brandon": "preston fairmont",
+"ian": "maniac",
+"sean's waifu": "diana stanley",
+"baby eaters": "drawn to the flame",
+"who do you work for": "interrogate",
+"acid": "strange~acid",
+"flash gordon": "finn edwards",
+"2spooky4me": "i'm outta here",
+"yeet": "act of desperation",
+"campaign ender": "crumbling precipice",
+"mack": "mob enforcer",
+"lolgun": "springfield",
+"freezing variant": "strange solution~freezing variant",
+"vial of snot": "strange solution",
+"brown jenkin's illegitimate family": "swarm of rats"
+            }
 
     def refresh_ah_api(self):
         self.ah_api = sorted([c for c in requests.get('https://arkhamdb.com/api/public/cards?encounter=1').json()],
@@ -72,37 +112,121 @@ class Arkham(commands.Cog):
 
         return m_response
 
-    @commands.command(aliases=['ahd'])
-    async def ahdeck(self, *, decklist: str):
-        """Arkham Horror deck listing"""
-        m_decklist = unidecode(decklist.lower())
-        re_decklist_id = re.search(r"(https://arkhamdb\.com/decklist/view/)(\d+)(/.*)", m_decklist)
-        m_response = ""
-        if re_decklist_id is None or re_decklist_id.group(2) is None:
-            m_response += "I see: \"{0}\", but I don't understand\n".format(m_decklist)
-        else:
-            m_response += self.deck_parse(re_decklist_id.group(2))
-        await self.bot.say(m_response[:2000])
+    @commands.command(aliases=['arkhamhelp'])
+    async def ahhelp(self, ctx):
+        m_response = "Hi! I'm your discord's Arkham bot. Here's what I can do:\n"
+        m_response += "!ah [name] - Player card search\n"
+        m_response += "!ahe [name] - Encounter card search\n"
+        m_response += "!ahb [name] - Search for card backsides\n"
+        m_response += "!ahX [name] - Player card search with level X\n"
+        m_response += "!aha [name] - Search through all cards and post up to 5\n"
+        m_response += "!ahn [number] - Search for a card with a specific number\n"
+        m_response += "All !ah commands also allow a [name]~[subname] format, for cards where two or more options exist\n"
+        m_response += "!ahfaq, !ahefaq, and !ahfaqX will get you the faq for the corresponding card\n"
+        m_response += "!ahd [deck number] - Print a publicly available ArkhamDB decklist."
+        m_response += "!ahdmine for a unpublished but public deck, !ahdyours for a published deck"
+        m_response += "!namelist - list all the current card nicknames\n"
+        m_response += "!name [nickname]:[actual name] - add a card nickname.\n Note that there should be no spaces between the nickname, colon, and actual name\n"
+        m_response += "!deletename [name] - remove the nickname you've listed, if it exists."
 
-    @commands.command(aliases=['arkham', 'arkhamhorror', 'ahe', 'ahb', 'ah1', 'ah2', 'ah3', 'ah4', 'ah5', 'aha'],
-                      pass_context=True)
+
+        await ctx.send(m_response[:2000])
+
+    @commands.command(aliases=['ahd', 'ahdmine', 'ahdyours', 'ahyours', 'ahmine', 'ahdm', 'ahdy', 'ahm', 'ahy' ], pass_context=True)
+    async def ahdeck(self, ctx):
+        """Arkham Horror deck listing"""
+        m_response = ""
+        code = ' '.join(ctx.message.content.split()[1:]).lower()
+        try:
+            if (ctx.invoked_with.__contains__('ahdm') or ctx.invoked_with.__contains__('ahm')):
+                deck = requests.get("https://arkhamdb.com/api/public/deck/" + code).json()
+                m_response += deck["name"] +" - " + deck["investigator_name"] + "\n" + "https://arkhamdb.com/deck/view/" + code + "\n"
+            else:
+                deck = requests.get("https://arkhamdb.com/api/public/decklist/" + code).json()
+                m_response += deck["name"] +" - " + deck["investigator_name"] + "\n" + "https://arkhamdb.com/decklist/view/" + code + "\n"
+            m_holder =""
+            if not self.init_api:
+                self.refresh_ah_api()
+            for cad in deck["slots"]:
+                m_response += str(deck["slots"][cad]) + "x "
+                m_response += next((c for c in self.ah_api if c["code"] == cad), None)["name"] + "\n"
+        except ValueError:
+            m_response += "I can only get you the deck by public number. Mystics and Guardians require setup, you know."
+        await ctx.send(m_response[:2000])
+       # m_decklist = unidecode(decklist.lower())
+       # re_decklist_id = re.search(r"(https://arkhamdb\.com/decklist/view/)(\d+)(/.*)", m_decklist)
+       # m_response = ""
+       # if re_decklist_id is None or re_decklist_id.group(2) is None:
+       #     m_response += "I see: \"{0}\", but I don't understand\n".format(m_decklist)
+       # else:
+       #     m_response += self.deck_parse(re_decklist_id.group(2))
+
+
+
+
+    @commands.command(aliases=['listnames', 'ln'])
+    async def namelist(self):
+
+        m_response = ""
+
+        for keys in self.query_corrections.keys():
+            m_response += keys + ':' + self.query_corrections[keys] +"\n"
+        await ctx.send(m_response[:2000])
+
+
+
+    @commands.command(aliases=['nickname','nick','rename'])
+    async def name(self,*args):
+        """Arkham Horror card nicknaming"""
+        m_response = ""
+        nickname = ' '.join(args).lower()
+        if nickname.find(":") == -1:
+            m_response += "Sorry, but I don't understand. Please form your nickname command as (nickname):(card name)"
+        else:
+            m_key,m_name = nickname.split(":", 1)
+            m_cards = [c for c in self.ah_api_p if c['name'].lower().__contains__(m_key)]
+            if m_cards:
+                m_response += "That's already a card name. I won't be made to do evil again!"
+            else:
+                m_response += m_key + " now means "
+                m_response += m_name
+                self.query_corrections.update({m_key:m_name})
+
+        await ctx.send(m_response[:2000])
+
+    @commands.command(aliases=['remove', 'cut', 'noname'])
+    async def deletename(self, *args):
+        m_response = ""
+        ctx = ' '.join(args)
+
+
+        if ctx in self.query_corrections.keys():
+            del self.query_corrections[ctx]
+            m_response += "key " + ctx + " deleted"
+        else:
+            m_response += "key " + ctx + " not found. Are you sure you had the exact name?"
+
+        await ctx.send(m_response[:2000])
+
+
+
+    @commands.command(aliases=['arkham', 'arkhamhorror', 'ahe', 'ahn', 'ahb', 'ah1', 'ah2', 'ah3', 'ah4', 'ah5', 'aha', 'ahfaq', 'ahefaq', 'ahfaq1', 'ahfaq2', 'ahfaq3', 'ahfaq4', 'ahfaq5'], pass_context=True)
     async def ah(self, ctx):
         """Arkham Horror card lookup"""
+        subexists = False
         m_query = ' '.join(ctx.message.content.split()[1:]).lower()
         img = 'imagesrc'
-
+        faq = False
         # Auto-correct some card names (and inside jokes)
-        query_corrections = {
-            "mississippi manatee": "leo de luca",
-            "manatee": "leo de luca",
-            "ordineu": "scavenging"
-        }
-        if m_query in query_corrections.keys():
-            m_query = query_corrections[m_query]
+        if m_query in self.query_corrections.keys():
+            m_query = self.query_corrections[m_query]
 
         # Auto-link some images instead of other users' names
         query_redirects = {
-        }
+            }
+        if m_query.find("~") >= 0:
+            m_query,m_subquery = m_query.split("~",1)
+            subexists = True
         m_response = ""
         if m_query in query_redirects.keys():
             m_response = query_redirects[m_query]
@@ -112,13 +236,17 @@ class Arkham(commands.Cog):
             m_response += "!ahe [name] - Encounter card search\n"
             m_response += "!ahb [name] - Search for card backsides\n"
             m_response += "!ahX [name] - Player card search with level X\n"
-            m_response += "!aha [name] - Search through all cards and post up to 5"
+            m_response += "!aha [name] - Search through all cards and post up to 5\n"
+            m_response += "!ahn [number] - Search for a card with a specific number\n"
+            m_response += "!ahfaq [name] - Search through all cards and post the FAQ\n"
+            m_response += "All !ah commands also allow a [name]~[subname] format, for cards where two or more options exist\n"
+            m_response += "!ahfaq, !ahefaq, and !ahfaqX will get you the faq for the corresponding card\n"
         else:
             # Otherwise find and handle card names
             if not self.init_api:
                 self.refresh_ah_api()
 
-            if ctx.invoked_with == "ahe":
+            if ctx.invoked_with.__contains__("ahe"):
                 # search encounter cards
                 m_cards = [c for c in self.ah_api if c['name'].lower().__contains__(m_query) and "spoiler" in c]
                 if not m_cards:
@@ -134,15 +262,22 @@ class Arkham(commands.Cog):
                 # search card back sides
                 m_cards = [c for c in self.ah_api if
                            (c['name'].lower().__contains__(m_query) and 'backimagesrc' in c) or (
-                                   "back_name" in c and c["back_name"].lower().__contains__(m_query))]
+                           "back_name" in c and c["back_name"].lower().__contains__(m_query))]
                 img = 'backimagesrc'
             elif ctx.invoked_with == "aha":
                 # search all cards
                 m_cards = [c for c in self.ah_api if c['name'].lower().__contains__(m_query)]
+            elif ctx.invoked_with == "ahn":
+                # search card with specific number
+                m_cards = [c for c in self.ah_api if c['code'].lower().__contains__(str(m_query))]
             else:
                 # search player cards
                 m_cards = [c for c in self.ah_api_p if c['name'].lower().__contains__(m_query)]
 
+            if subexists:
+                m_check = [c for c in m_cards if c['subname'].lower().__contains__(m_subquery)]
+                if m_check:
+                    m_cards = m_check
             for c in m_cards:
                 if m_query == c['name'].lower():
                     # if exact name match, post only the one card
@@ -151,6 +286,25 @@ class Arkham(commands.Cog):
             if len(m_cards) == 1:
                 try:
                     m_response += "http://arkhamdb.com" + m_cards[0][img]
+                    if ctx.invoked_with.__contains__("faq"):
+                        #Print it
+                        holder = requests.get('http://arkhamdb.com/api/public/faq/' + m_cards[0]["code"]).json()
+                        if not holder:
+                            m_response = "No FAQ exists for this card. Perhaps, in another reality, it did?"
+                        else:
+                            m_response = holder[0]['text'];
+                            m_response = re.sub("<span class=", "", m_response)
+                            m_response = re.sub("icon-","",m_response)
+                            m_response = re.sub("></span>", "", m_response)
+                            #_response = re.sub("[\]].*?[\)]", "", m_response)
+                            m_response = re.sub("[\[\]]", "", m_response)
+                            #m_response = re.sub("[\<].*?[\-]","", m_response)
+                            #m_response = re.sub("[\>].*?[\>]", "", m_response)
+                            #m_response = re.sub("[\]].*?[\]]", "", m_response)
+
+                            
+
+
                 except KeyError as e:
                     if e.args[0] == "imagesrc":
                         # if no image on ArkhamDB
@@ -170,7 +324,7 @@ class Arkham(commands.Cog):
                     # else just post a link
                     m_response = "'{}' matching cards found:\n".format(len(m_cards))
                     m_response += "https://arkhamdb.com/find?q=" + m_query.replace(" ", "+")
-        await self.bot.say(m_response[:2000])
+        await ctx.send(m_response[:2000])
 
 
 def setup(bot):
